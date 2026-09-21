@@ -105,6 +105,7 @@ const app = {
   onToolDown(tool, raw) { return tool === 'ap' ? coverage.placeAp(raw) : null; },
   setActiveFloor(id) { setActiveFloor(id); },
   saveSoon() { scheduleSave(); },
+  refreshPanel() { renderRight(); },
 };
 
 const editor = new Editor($('#canvas'), app);

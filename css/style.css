@@ -168,3 +168,19 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
 .kv td:first-child { color: var(--muted); }
 .formula { background: var(--accent-soft); border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: 12px; }
 details summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
+.seg { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; margin: 8px 0; }
+.seg label { flex: 1; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; text-align: center; padding: 6px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.seg input:checked + span { background: var(--accent); color: #fff; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.progress { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.progress span { display: block; height: 100%; background: var(--accent); transition: width 0.1s; }
+.big-stat { font-size: 15px; margin: 6px 0; }
+.big-stat b { color: var(--accent); }
+.warn-text { color: var(--warn); }
+.steps td { vertical-align: top; padding: 5px 4px; }
+.steps tr.rejected td { opacity: 0.6; font-style: italic; }
+.gainbar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 2px; }
+.gainbar span { display: block; height: 100%; background: var(--accent); }
+.steps tr.rejected .gainbar span { background: var(--muted); }

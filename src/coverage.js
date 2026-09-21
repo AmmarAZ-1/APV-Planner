@@ -174,15 +174,16 @@ export function createCoverage(app, editor) {
     return ap ? dragAp(ap) : null;
   }
 
-  /** "ap" tool: place the AP (stage 2 uses a single AP; clicking again moves it). */
+  /** "ap" tool: drag an existing AP, or click empty space to add one. */
   function placeAp(raw) {
+    const hit = hitAp(raw);
+    if (hit) return dragAp(hit);
     const f = editor.floor;
     app.checkpoint();
-    const existing = app.project.aps[0];
-    if (existing) Object.assign(existing, { floorId: f.id, x: raw.x, y: raw.y });
-    else app.project.aps.push({ id: uid('ap'), floorId: f.id, x: raw.x, y: raw.y });
+    const ap = { id: uid('ap'), floorId: f.id, x: raw.x, y: raw.y };
+    app.project.aps.push(ap);
     app.changed();
-    return dragAp(app.project.aps[0], false);
+    return dragAp(ap, false);
   }
 
   /** HUD text for the cursor position: RSSI and the loss breakdown from the nearest AP. */
@@ -221,16 +222,18 @@ export function createCoverage(app, editor) {
         : m.leaky ? `<li>${esc(floors[i].label)}: the exterior wall isn't closed, so its bounding box is used as indoor area.</li>` : '').join('') : '';
     el.innerHTML = `
       <section>
-        <div class="section-head"><h2>Access point</h2></div>
+        <div class="section-head"><h2>Access points (${aps.length})</h2>
+          ${aps.length ? '<button class="small danger" id="btnRemoveAllAps">Remove all</button>' : ''}</div>
         ${aps.length ? `
-          <p class="tiny">On <b>${esc(floors[aps[0].floorIndex].label)}</b> at
-            <span class="mono">x ${fmt(app.project.aps[0].x, 2)} · y ${fmt(app.project.aps[0].y, 2)} · z ${fmt(cov.scene.floors[aps[0].floorIndex].z0 + p.apHeight, 2)} m</span></p>
-          <div class="row">
-            <label>Floor <select id="apFloor">${floors.map((f, i) => `<option value="${f.id}" ${i === aps[0].floorIndex ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></label>
-            <button class="small" data-tool-btn="ap">Move</button>
-            <button class="small danger" id="btnRemoveAp">Remove</button>
-          </div>
-          <p class="muted tiny">Drag the AP marker with the Select tool to move it live.</p>`
+          <table>
+            ${aps.map((ap, k) => `<tr data-ap="${ap.id}">
+              <td><b>AP${aps.length > 1 ? k + 1 : ''}</b></td>
+              <td><select data-ap-floor>${floors.map((f, i) => `<option value="${f.id}" ${i === ap.floorIndex ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></td>
+              <td class="mono">${fmt(ap.x, 1)}, ${fmt(ap.y, 1)}, z ${fmt(cov.scene.floors[ap.floorIndex].z0 + p.apHeight, 1)}</td>
+              <td><button class="icon small danger" data-remove-ap title="Remove">✕</button></td></tr>`).join('')}
+          </table>
+          <div class="row"><button class="small" data-tool-btn="ap">◉ Add / move AP</button></div>
+          <p class="muted tiny">Drag AP markers with Select to move them live. Coordinates are building-wide meters.</p>`
         : `<p class="muted tiny">Place an AP on any floor to see its coverage everywhere in the house.</p>
            <div class="row"><button class="small primary" data-tool-btn="ap">◉ Place AP</button>
            ${app.project.ont ? '<button class="small" id="btnApAtOnt">Put AP at the ONT</button>' : ''}</div>`}
@@ -288,7 +291,14 @@ export function createCoverage(app, editor) {
     const t = e.target;
     if (e.type === 'input' && t.id === 'covOpacity') { app.ui.heatOpacity = parseFloat(t.value); editor.requestRender(); return; }
     if (e.type === 'click') {
-      if (t.id === 'btnRemoveAp') { app.checkpoint(); app.project.aps = []; app.changed(); }
+      if (t.id === 'btnRemoveAllAps') { app.checkpoint(); app.project.aps = []; app.changed(); }
+      const rm = t.closest('[data-remove-ap]');
+      if (rm) {
+        const id = rm.closest('[data-ap]').dataset.ap;
+        app.checkpoint();
+        app.project.aps = app.project.aps.filter((a) => a.id !== id);
+        app.changed();
+      }
       if (t.id === 'btnApAtOnt') {
         const ont = app.project.ont;
         app.checkpoint();
@@ -301,9 +311,9 @@ export function createCoverage(app, editor) {
     if (t.id === 'covShow') { app.ui.showHeatmap = t.checked; editor.requestRender(); app.saveSoon(); }
     else if (t.id === 'covOutside') { app.ui.heatOutside = t.checked; invalidate(); }
     else if (t.id === 'covFloor') app.setActiveFloor(t.value);
-    else if (t.id === 'apFloor') {
+    else if (t.dataset.apFloor !== undefined) {
       // keep the building-wide position, move to the other floor's frame
-      const ap = app.project.aps[0];
+      const ap = app.project.aps.find((a) => a.id === t.closest('[data-ap]').dataset.ap);
       const from = app.project.floors.find((f) => f.id === ap.floorId);
       const to = app.project.floors.find((f) => f.id === t.value);
       app.checkpoint();
