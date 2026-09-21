@@ -1,0 +1,12 @@
+{
+  "name": "apv-planner",
+  "version": "0.1.0",
+  "description": "Trace a multi-floor house plan, model Wi-Fi coverage and plan access point placement.",
+  "type": "module",
+  "private": true,
+  "license": "GPL-3.0",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "test": "node --test"
+  }
+}

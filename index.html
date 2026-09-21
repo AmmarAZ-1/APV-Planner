@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APV Planner</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◉</span> APV Planner</div>
+    <input id="projectName" class="project-name" aria-label="Project name" />
+    <div class="topbar-actions">
+      <button id="btnUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+      <button id="btnRedo" title="Redo (Ctrl+Y)">↷ Redo</button>
+      <span class="sep"></span>
+      <select id="sampleSelect" aria-label="Load sample">
+        <option value="">Samples…</option>
+        <option value="traced">Sample 2-storey house (traced)</option>
+        <option value="images">Sample plan images only (practise tracing)</option>
+      </select>
+      <button id="btnNew">New</button>
+      <label class="button" title="Open a saved project / model JSON">Open…<input id="fileOpen" type="file" accept=".json,application/json" hidden /></label>
+      <button id="btnSave" title="Download project incl. images as JSON">Save</button>
+      <button id="btnJson" class="primary">Model JSON</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel left" id="leftPanel">
+      <section>
+        <div class="section-head"><h2>Floors</h2><button id="btnAddFloor" class="small">+ Add floor</button></div>
+        <p class="muted tiny">Listed bottom → top. Each floor's plane sits at the sum of the storey heights below it.</p>
+        <ol id="floorList" class="floor-list"></ol>
+      </section>
+      <section id="floorDetails"></section>
+    </aside>
+
+    <section class="stage">
+      <div class="toolbar" id="toolbar">
+        <div class="tools" role="toolbar" aria-label="Tools">
+          <button data-tool="select" title="Select / move (V)">⌖ Select</button>
+          <button data-tool="wall" title="Wall polyline (W)">╱ Wall</button>
+          <button data-tool="rect" title="Rectangular room (R)">▭ Room</button>
+          <button data-tool="opening" title="Cut door/window into a wall (O)">⊟ Opening</button>
+          <button data-tool="scale" title="Calibrate scale (S)">⟷ Scale</button>
+          <button data-tool="origin" title="Floor alignment point (A)">⊕ Align</button>
+          <button data-tool="ont" title="Place ONT (N)">▣ ONT</button>
+        </div>
+        <div class="tool-options" id="toolOptions"></div>
+      </div>
+      <div class="canvas-wrap"><canvas id="canvas"></canvas></div>
+      <div class="hud"><span id="hudHint"></span><span id="hudPos" class="mono"></span></div>
+    </section>
+
+    <aside class="panel right" id="rightPanel"></aside>
+  </main>
+
+  <dialog id="scaleDialog">
+    <form method="dialog" class="dialog-body">
+      <h3>Set scale</h3>
+      <p>The two points are <b id="scalePx">0</b> image pixels apart. What is the real distance between them?</p>
+      <label class="field">Distance (m)<input id="scaleMeters" type="number" min="0.01" step="0.01" required /></label>
+      <div class="dialog-actions">
+        <button type="button" onclick="this.closest('dialog').close('cancel')">Cancel</button>
+        <button value="ok" class="primary">Apply scale</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="jsonDialog" class="wide">
+    <div class="dialog-body">
+      <h3>Model JSON</h3>
+      <p class="muted tiny">Geometry in meters. <code>imageUrl</code> is a session blob URL here; "Download" embeds the images as data URLs so the file can be reopened anywhere.</p>
+      <pre id="jsonView" class="json-view"></pre>
+      <div class="dialog-actions">
+        <button id="btnJsonCopy">Copy</button>
+        <button id="btnJsonDownload">Download (with images)</button>
+        <button id="btnJsonClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
