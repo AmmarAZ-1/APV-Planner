@@ -169,7 +169,9 @@ export class Editor {
     const app = this.app;
     switch (this.tool) {
       case 'select': {
-        // vertex drag first (moves every wall endpoint sharing that vertex)
+        const picked = app.onCanvasPick?.(raw, e); // markers owned by other modules (e.g. APs)
+        if (picked) { this.drag = picked; return; }
+        // vertex drag (moves every wall endpoint sharing that vertex)
         const tol = HIT_PX / this.view.s;
         let vx = null, best = tol;
         for (const w of f.walls) {
@@ -187,8 +189,6 @@ export class Editor {
         }
         const hit = this.nearestWall(raw);
         if (hit) { this.select(hit.wall.id); return; }
-        const extra = app.onCanvasPick?.(raw, e);
-        if (extra) { this.drag = extra; return; }
         this.select(null);
         this.drag = { type: 'pan', sx: e.clientX, sy: e.clientY, ox: this.view.ox, oy: this.view.oy };
         return;

@@ -4,6 +4,7 @@
 // which lets plans drawn from differently-cropped images line up vertically.
 
 import { defaultMaterialDb, MATERIAL_BY_ID } from './materials.js';
+import { DEFAULT_PARAMS } from './propagation.js';
 
 export const DEFAULT_PPM = 50; // pixels per meter assumed before a floor is calibrated
 export const DEFAULT_STOREY_HEIGHT = 2.7;
@@ -19,6 +20,8 @@ export function createProject() {
     floors: [createFloor('Ground floor')],
     ont: null, // { floorId, x, y } local meters
     materials: defaultMaterialDb(),
+    aps: [], // [{ id, floorId, x, y }] local meters
+    params: { ...DEFAULT_PARAMS, band: '2.4' }, // propagation model parameters
   };
 }
 
@@ -74,9 +77,8 @@ export function rescaleFloor(project, floor, factor) {
   }
   floor.origin.x *= factor;
   floor.origin.y *= factor;
-  if (project.ont && project.ont.floorId === floor.id) {
-    project.ont.x *= factor;
-    project.ont.y *= factor;
+  for (const p of [project.ont, ...(project.aps || [])]) {
+    if (p && p.floorId === floor.id) { p.x *= factor; p.y *= factor; }
   }
 }
 
@@ -119,6 +121,11 @@ export function toModelJSON(project, imageUrlFor = () => null) {
       ontIndex >= 0
         ? { floorIndex: ontIndex, x: r3(project.ont.x), y: r3(project.ont.y), z: r3(floorZ(project, ontIndex)) }
         : null,
+    accessPoints: (project.aps || []).map((ap) => {
+      const i = project.floors.findIndex((f) => f.id === ap.floorId);
+      return { floorIndex: i, x: r3(ap.x), y: r3(ap.y), z: r3(floorZ(project, i) + project.params.apHeight) };
+    }).filter((ap) => ap.floorIndex >= 0),
+    propagation: { ...project.params },
   };
 }
 
@@ -150,6 +157,11 @@ export function fromModelJSON(json) {
   });
   if (json.ont && project.floors[json.ont.floorIndex]) {
     project.ont = { floorId: project.floors[json.ont.floorIndex].id, x: num(json.ont.x), y: num(json.ont.y) };
+  }
+  if (json.propagation) Object.assign(project.params, json.propagation);
+  for (const ap of json.accessPoints || []) {
+    const f = project.floors[ap.floorIndex];
+    if (f) project.aps.push({ id: uid('ap'), floorId: f.id, x: num(ap.x), y: num(ap.y) });
   }
   return { project, imageUrls };
 }

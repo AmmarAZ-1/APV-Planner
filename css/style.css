@@ -154,3 +154,14 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
   .layout { grid-template-columns: 1fr; grid-template-rows: auto 70vh auto; }
   .panel.left, .panel.right { border: none; }
 }
+
+.tabs { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel); z-index: 1; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; color: var(--muted); font-weight: 600; }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.legend { position: relative; margin-top: 8px; }
+.legend-bar { height: 10px; border-radius: 3px; }
+.legend-ticks { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.legend-threshold { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--text); }
+.meter { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--border); vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.meter span { display: block; height: 100%; background: var(--ok); }
+.warn-list { color: var(--warn); padding-left: 16px; }

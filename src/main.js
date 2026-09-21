@@ -1,5 +1,6 @@
 // App controller: owns the project state, undo history, images, sidebars and dialogs.
 
+import { createCoverage, ensureCoverageState } from './coverage.js';
 import { Editor } from './editor.js';
 import { MATERIALS, MATERIAL_BY_ID } from './materials.js';
 import {
@@ -21,8 +22,9 @@ const TOOL_HINTS = {
   scale: 'Click two points a known distance apart (e.g. the ends of a scale bar or a wall you have measured)',
   origin: 'Click a feature visible on every floor (e.g. an outside corner). Floors are stacked on these points.',
   ont: 'Click where the ONT / fibre terminal is',
+  ap: 'Click to place the AP (click again or drag it with Select to move) · hover the plan to read RSSI',
 };
-const TOOL_KEYS = { v: 'select', w: 'wall', r: 'room', o: 'opening', s: 'scale', a: 'origin', n: 'ont' };
+const TOOL_KEYS = { v: 'select', w: 'wall', r: 'room', o: 'opening', s: 'scale', a: 'origin', n: 'ont', p: 'ap' };
 
 const app = {
   project: createProject(),
@@ -37,6 +39,10 @@ const app = {
     showGhost: true,
     showGrid: false,
     imageOpacity: 0.85,
+    rightTab: 'plan',
+    showHeatmap: true,
+    heatOpacity: 0.6,
+    heatOutside: false,
   },
   undoStack: [],
   redoStack: [],
@@ -54,6 +60,7 @@ const app = {
 
   /** Notify of a model change. `light` = geometry is mid-drag, skip sidebar rebuild + autosave. */
   changed({ light = false } = {}) {
+    coverage.invalidate();
     editor.requestRender();
     if (light) return;
     renderAll();
@@ -87,17 +94,25 @@ const app = {
   },
 
   onHover(p) {
-    $('#hudPos').textContent = p ? `x ${fmt(p.x)} m   y ${fmt(p.y)} m` : '';
+    const info = p ? coverage.hoverInfo(p) : '';
+    $('#hudPos').textContent = p ? `${info ? info + '   ·   ' : ''}x ${fmt(p.x)} m   y ${fmt(p.y)} m` : '';
   },
+
+  onCanvasPick(raw) { return coverage.onCanvasPick(raw); },
+  onToolDown(tool, raw) { return tool === 'ap' ? coverage.placeAp(raw) : null; },
+  setActiveFloor(id) { setActiveFloor(id); },
+  saveSoon() { scheduleSave(); },
 };
 
 const editor = new Editor($('#canvas'), app);
-window.apv = { app, editor }; // handy for debugging from the console
+const coverage = createCoverage(app, editor);
+window.apv = { app, editor, coverage }; // handy for debugging from the console
 
 // ---------------------------------------------------------------- undo / redo
 function restore(snapshot) {
   const s = JSON.parse(snapshot);
   app.project = s.project;
+  ensureCoverageState(app.project);
   app.activeFloorId = s.activeFloorId;
   editor.select(null);
   app.changed();
@@ -148,6 +163,7 @@ function scheduleSave() {
 
 async function loadProject(project, imageBlobs = {}, activeFloorId = null) {
   app.images.clear();
+  ensureCoverageState(project);
   app.project = project;
   app.activeFloorId = activeFloorId && project.floors.some((f) => f.id === activeFloorId) ? activeFloorId : project.floors[0].id;
   for (const f of project.floors) {
@@ -312,12 +328,26 @@ function materialOptions(selected) {
 }
 
 function renderRight() {
+  const el = $('#rightPanel');
+  const tabs = `<div class="tabs" role="tablist">
+      <button role="tab" data-tab="plan" class="${app.ui.rightTab === 'plan' ? 'active' : ''}">Plan</button>
+      <button role="tab" data-tab="coverage" class="${app.ui.rightTab === 'coverage' ? 'active' : ''}">Coverage</button>
+    </div>`;
+  if (app.ui.rightTab === 'coverage') {
+    el.innerHTML = tabs + '<div id="tabBody"></div>';
+    coverage.renderPanel($('#tabBody'));
+    return;
+  }
+  renderPlanPanel(el, tabs);
+}
+
+function renderPlanPanel(el, tabs) {
   const f = app.activeFloor;
   const p = app.project;
   const sel = f.walls.find((w) => w.id === app.selectedWallId);
   const ont = p.ont;
   const ontFloorIdx = ont ? p.floors.findIndex((x) => x.id === ont.floorId) : -1;
-  $('#rightPanel').innerHTML = `
+  el.innerHTML = tabs + `
     <section>
       <div class="section-head"><h2>Walls on ${esc(f.label)} (${f.walls.length})</h2>
         ${f.walls.length ? '<button class="small danger" id="btnClearWalls">Clear all</button>' : ''}</div>
@@ -507,6 +537,7 @@ $('#leftPanel').addEventListener('click', (e) => {
     const i = floors.indexOf(f);
     floors.splice(i, 1);
     if (app.project.ont?.floorId === f.id) app.project.ont = null;
+    app.project.aps = app.project.aps.filter((ap) => ap.floorId !== f.id);
     app.activeFloorId = floors[Math.max(0, i - 1)].id;
     editor.select(null);
     app.changed();
@@ -522,8 +553,11 @@ $('#leftPanel').addEventListener('click', (e) => {
 });
 
 $('#rightPanel').addEventListener('click', (e) => {
+  const tab = e.target.closest('[data-tab]');
+  if (tab) { app.ui.rightTab = tab.dataset.tab; renderRight(); scheduleSave(); return; }
   const tb = e.target.closest('[data-tool-btn]');
   if (tb) { setTool(tb.dataset.toolBtn); return; }
+  if (app.ui.rightTab === 'coverage') { coverage.onPanelEvent(e); return; }
   if (e.target.id === 'btnClearOnt') { app.checkpoint(); app.project.ont = null; app.changed(); return; }
   if (e.target.id === 'btnClearWalls') {
     const f = app.activeFloor;
@@ -537,7 +571,11 @@ $('#rightPanel').addEventListener('click', (e) => {
   editor.select(row.dataset.wall);
 });
 
+$('#rightPanel').addEventListener('input', (e) => {
+  if (app.ui.rightTab === 'coverage') coverage.onPanelEvent(e);
+});
 $('#rightPanel').addEventListener('change', (e) => {
+  if (app.ui.rightTab === 'coverage') { coverage.onPanelEvent(e); return; }
   const t = e.target;
   const f = app.activeFloor;
   const row = t.closest('tr[data-wall]');
