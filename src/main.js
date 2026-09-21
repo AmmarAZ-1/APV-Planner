@@ -2,6 +2,7 @@
 
 import { createCoverage, ensureCoverageState } from './coverage.js';
 import { Editor } from './editor.js';
+import { createPlanner, ensurePlanState } from './planner.js';
 import { MATERIALS, MATERIAL_BY_ID } from './materials.js';
 import {
   addWall, applyMaterialDefaults, createFloor, createProject, DEFAULT_PPM, floorZ,
@@ -46,6 +47,7 @@ const app = {
   },
   undoStack: [],
   redoStack: [],
+  modelVersion: 0, // bumped on every model change; lets panels cache derived results
   selectedWallId: null,
 
   get activeFloor() {
@@ -60,6 +62,7 @@ const app = {
 
   /** Notify of a model change. `light` = geometry is mid-drag, skip sidebar rebuild + autosave. */
   changed({ light = false } = {}) {
+    this.modelVersion++;
     coverage.invalidate();
     editor.requestRender();
     if (light) return;
@@ -106,13 +109,16 @@ const app = {
 
 const editor = new Editor($('#canvas'), app);
 const coverage = createCoverage(app, editor);
-window.apv = { app, editor, coverage }; // handy for debugging from the console
+const planner = createPlanner(app);
+ensurePlanState(app.project);
+window.apv = { app, editor, coverage, planner }; // handy for debugging from the console
 
 // ---------------------------------------------------------------- undo / redo
 function restore(snapshot) {
   const s = JSON.parse(snapshot);
   app.project = s.project;
   ensureCoverageState(app.project);
+  ensurePlanState(app.project);
   app.activeFloorId = s.activeFloorId;
   editor.select(null);
   app.changed();
@@ -164,6 +170,7 @@ function scheduleSave() {
 async function loadProject(project, imageBlobs = {}, activeFloorId = null) {
   app.images.clear();
   ensureCoverageState(project);
+  ensurePlanState(project);
   app.project = project;
   app.activeFloorId = activeFloorId && project.floors.some((f) => f.id === activeFloorId) ? activeFloorId : project.floors[0].id;
   for (const f of project.floors) {
@@ -332,10 +339,12 @@ function renderRight() {
   const tabs = `<div class="tabs" role="tablist">
       <button role="tab" data-tab="plan" class="${app.ui.rightTab === 'plan' ? 'active' : ''}">Plan</button>
       <button role="tab" data-tab="coverage" class="${app.ui.rightTab === 'coverage' ? 'active' : ''}">Coverage</button>
+      <button role="tab" data-tab="planner" class="${app.ui.rightTab === 'planner' ? 'active' : ''}">Plan APs</button>
     </div>`;
-  if (app.ui.rightTab === 'coverage') {
+  const module = { coverage, planner }[app.ui.rightTab];
+  if (module) {
     el.innerHTML = tabs + '<div id="tabBody"></div>';
-    coverage.renderPanel($('#tabBody'));
+    module.renderPanel($('#tabBody'));
     return;
   }
   renderPlanPanel(el, tabs);
@@ -558,6 +567,7 @@ $('#rightPanel').addEventListener('click', (e) => {
   const tb = e.target.closest('[data-tool-btn]');
   if (tb) { setTool(tb.dataset.toolBtn); return; }
   if (app.ui.rightTab === 'coverage') { coverage.onPanelEvent(e); return; }
+  if (app.ui.rightTab === 'planner') { planner.onPanelEvent(e); return; }
   if (e.target.id === 'btnClearOnt') { app.checkpoint(); app.project.ont = null; app.changed(); return; }
   if (e.target.id === 'btnClearWalls') {
     const f = app.activeFloor;
@@ -573,9 +583,11 @@ $('#rightPanel').addEventListener('click', (e) => {
 
 $('#rightPanel').addEventListener('input', (e) => {
   if (app.ui.rightTab === 'coverage') coverage.onPanelEvent(e);
+  if (app.ui.rightTab === 'planner') planner.onPanelEvent(e);
 });
 $('#rightPanel').addEventListener('change', (e) => {
   if (app.ui.rightTab === 'coverage') { coverage.onPanelEvent(e); return; }
+  if (app.ui.rightTab === 'planner') { planner.onPanelEvent(e); return; }
   const t = e.target;
   const f = app.activeFloor;
   const row = t.closest('tr[data-wall]');

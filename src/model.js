@@ -126,6 +126,7 @@ export function toModelJSON(project, imageUrlFor = () => null) {
       return { floorIndex: i, x: r3(ap.x), y: r3(ap.y), z: r3(floorZ(project, i) + project.params.apHeight) };
     }).filter((ap) => ap.floorIndex >= 0),
     propagation: { ...project.params },
+    plan: project.plan ? { ...project.plan } : undefined,
   };
 }
 
@@ -159,6 +160,7 @@ export function fromModelJSON(json) {
     project.ont = { floorId: project.floors[json.ont.floorIndex].id, x: num(json.ont.x), y: num(json.ont.y) };
   }
   if (json.propagation) Object.assign(project.params, json.propagation);
+  if (json.plan) project.plan = { ...json.plan };
   for (const ap of json.accessPoints || []) {
     const f = project.floors[ap.floorIndex];
     if (f) project.aps.push({ id: uid('ap'), floorId: f.id, x: num(ap.x), y: num(ap.y) });
